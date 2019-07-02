@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-12 col-md-6">
+    {% if product.image %}
+      <img src="{{product.image.url}}" alt="image" width="250px">
+    {% endif %}
+    {{product.title}} <br>
+  </div>
+  <div class="col-12 col-md-6">
+    {% include "products/update.html" with product=object cart=cart %}    
+  </div>
+</div>
+
+    
+{% endblock content %}

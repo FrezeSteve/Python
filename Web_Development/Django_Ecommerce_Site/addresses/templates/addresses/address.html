@@ -1,0 +1,19 @@
+<div class='col-6'>
+    {%for address in address_qs%}
+    <form method='POST' action='{{action_url}}'>
+    {% csrf_token %}
+    {% if next_url %}
+    <input type='hidden' name='next' value='{{next_url}}' />
+    {% endif %}
+    {%load bootstrap3 %}
+    {% if address_type %}
+    <input type='hidden' name='address_type' value='{{address_type}}' />
+    {% endif %}
+    <p><label for='address-{{address.id}}'>
+    <input id='address-{{address.id}}' type='radio' name='shipping_address' value='{{address.id}}' />
+    </label>
+    {{address.address_line_1}}</p>
+    {%endfor%}
+    <button type='submit' class='btn btn-success'> Use Address</button> 
+    </form> 
+</div>

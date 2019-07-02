@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+  {% for product in product_list %}
+    <a href="{{product.get_absolute_url}}">{{product.title}}</a>  <br>
+  {% endfor %}
+{% endblock content %} 
