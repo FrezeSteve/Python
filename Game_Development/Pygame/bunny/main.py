@@ -14,6 +14,7 @@ TITLE = 'Bunny'
 WIDTH = 480
 HEIGHT = 600
 FPS = 60
+FONT_NAME = 'serif'
 
 # define colors
 WHITE = (255, 255, 255)
@@ -81,35 +82,41 @@ sprite_mine = pygame.sprite.Sprite
 
 # platform list
 PLATFORM_LIST = [
-    (0, HEIGHT-30, WIDTH, 30),
-    (WIDTH//2-50, HEIGHT//2-100, 100, 30),
-    (30, HEIGHT-200, 100, 30),
-    (WIDTH-100, HEIGHT-250, 100, 30),
+    (0, HEIGHT - 30),
+    (WIDTH // 2 - 50, HEIGHT // 2 - 100),
+    (30, HEIGHT - 200),
+    (WIDTH - 100, HEIGHT - 250),
 ]
+
 
 # platform
 
 
 class Platform(sprite_mine):
-    def __init__(self, x, y, w, h):
+    def __init__(self, x, y):
         sprite_mine.__init__(self)
-        self.image = pygame.Surface((w, h))
-        self.image.fill(GREEN)
+        self._graphics()
+        # self.image = pygame.Surface((w, h))
+        self.image = random.choice([self.plat_image1, self.plat_image2])
+        # self.image.fill(GREEN)
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
 
-    def update(self):
-        if self.rect.top >= HEIGHT:
-            self.kill()
+    def _graphics(self):
+        self.plat_image1, rect1 = load_image("ground_grass.png", BLACK)
+        self.plat_image1 = pygame.transform.scale(self.plat_image1, (rect1.width//2, rect1.height//2))
+        self.plat_image2, rect2 = load_image("ground_grass_small.png", BLACK)
+        self.plat_image2 = pygame.transform.scale(self.plat_image2, (rect2.width // 2, rect2.height // 2))
 
 
 # Player settings
-PLAYER_STARTING_POSITION = Vec(WIDTH//2, HEIGHT//2)
 PLAYER_ACCELERATION = 3
 PLAYER_FRICTION = -1
 PLAYER_GRAVITY = 1
-PLAYER_VERTICAL_JUMP = -20
+PLAYER_VERTICAL_JUMP = -25
+PLAYER_CUT_JUMP = -3
+
 
 # the player
 
@@ -123,6 +130,7 @@ class Player(sprite_mine):
         self.image_orig = game.bunny_standing[0]
         self.image = self.image_orig.copy()
         self.rect = self.image.get_rect()
+        PLAYER_STARTING_POSITION = Vec(WIDTH // 2 - 150, HEIGHT // 2)
         self.rect.center = PLAYER_STARTING_POSITION
         # self.rect.topleft = self.pos
 
@@ -138,9 +146,18 @@ class Player(sprite_mine):
         self.acc = Vec(0, 0)
         self.pos = PLAYER_STARTING_POSITION
 
+        # self.left = self.rect.midbottom.x - 3
+        # self.right = self.rect.midbottom.x + 3
+
     def jump(self):
         if not self.game.jumping:
             self.vel.y = PLAYER_VERTICAL_JUMP
+            self.game.jumping = True
+
+    def jump_cut(self):
+        if self.vel.y < PLAYER_CUT_JUMP:
+            self.vel.y = PLAYER_CUT_JUMP
+            print(self.vel.y)
 
     def animate(self):
         if abs(self.vel.x) > 0:
@@ -175,11 +192,9 @@ class Player(sprite_mine):
             self.acc.x = PLAYER_ACCELERATION
         # wap the character around the screen
         if self.rect.left > WIDTH:
-            self.pos.x = - self.rect.width//2
+            self.pos.x = - self.rect.width // 2
         elif self.rect.right < 0:
-            self.pos.x = WIDTH + self.rect.width//2
-        if self.rect.top > HEIGHT:
-            self.kill()
+            self.pos.x = WIDTH + self.rect.width // 2
         if self.vel.y < PLAYER_VERTICAL_JUMP:
             self.vel.y = PLAYER_VERTICAL_JUMP
         elif self.vel.y > -PLAYER_VERTICAL_JUMP:
@@ -208,6 +223,7 @@ class Game:
         self.running = True
         self._graphics()
         self.jumping = False
+        self.font_name = pygame.font.match_font(FONT_NAME)
 
     def _graphics(self):
         # background
@@ -236,6 +252,7 @@ class Game:
 
     # Start a new Game
     def new(self):
+        self.score = 0
         self.all_sprites = pygame.sprite.Group()
         self.platform = pygame.sprite.Group()
         self.player = Player(self)
@@ -267,24 +284,37 @@ class Game:
             hits = pygame.sprite.spritecollide(
                 self.player, self.platform, False)
             if hits:
-                self.player.pos.y = hits[0].rect.top
-                self.player.vel.y = 0
-                self.jumping = False
+                lowest = hits[0]
+                for hit in hits:
+                    if lowest.rect.bottom > hit.rect.bottom:
+                        lowest = hit
+                if self.player.pos.y < lowest.rect.centery:
+                    self.player.pos.y = lowest.rect.top
+                    self.player.vel.y = 0
+                    self.jumping = False
+                if lowest.rect.right + 3 > self.player.pos.x > lowest.rect.left - 3:
+                    pass
         # scroll the screen
-        if self.player.rect.top <= HEIGHT/4:
+        if self.player.rect.top <= HEIGHT / 4:
             self.player.pos.y += abs(self.player.vel.y)
             for plat in self.platform:
                 plat.rect.y += max(abs(self.player.vel.y), 10)
+                if plat.rect.top >= HEIGHT:
+                    plat.kill()
+                    self.score += random.randint(0, 10)
         # if player dies game ends
         if self.player.rect.top > HEIGHT:
             for sprite in self.all_sprites:
                 sprite.rect.y -= max(self.player.vel.y, 10)
-            self.running = False
+                if sprite.rect.bottom < 0:
+                    sprite.kill()
+        if len(self.platform) == 0:
+            self.playing = False
         # spawn new platforms
         while len(self.platform) < 5:
             width = random.randrange(100, 150)
-            p = Platform(random.randrange(0, WIDTH-width),
-                         random.randrange(-65, -30), width, 30)
+            p = Platform(random.randrange(0, WIDTH - width),
+                         random.randrange(-65, -30))
             self.platform.add(p)
             self.all_sprites.add(p)
 
@@ -299,7 +329,8 @@ class Game:
             # user input for jumping
             if event.type == KEYDOWN and event.key == K_SPACE:
                 self.player.jump()
-                self.jumping = True
+            if event.type == KEYUP and event.key == K_SPACE:
+                self.player.jump_cut()
 
     # Game loop draw
     def draw(self):
@@ -309,6 +340,8 @@ class Game:
         self.screen.blit(self.background, self.background_rect)
         # update all the sprites
         self.all_sprites.draw(self.screen)
+        # draw the score on the screen
+        self.draw_text(str(self.score), 22, BLACK, WIDTH // 2, 15)
         # draw the fps
         pygame.display.set_caption(
             TITLE + " | {:.2f}|".format(self.clock.get_fps()))
@@ -316,10 +349,52 @@ class Game:
         pygame.display.flip()
 
     # Game start screen
-    def show_start_screen(self): pass
+    def show_start_screen(self):
+        self.screen.fill(BLACK)
+        # blit the background
+        self.screen.blit(self.background, self.background_rect)
+        # draw other things on the screen
+        self.draw_text(TITLE, 48, BLACK, WIDTH // 2, HEIGHT // 4)
+        self.draw_text("Arrows to move, Space to jump", 22, BLACK, WIDTH // 2, HEIGHT // 2)
+        self.draw_text("Press a key to play", 22, BLACK, WIDTH // 2, HEIGHT * 3 / 4)
+        pygame.display.flip()
+        self.wait_for_key()
+
+    # Loop used by the other screens
+    def wait_for_key(self):
+        waiting = True
+        while waiting:
+            self.clock.tick(FPS)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    waiting = False
+                    self.running = False
+                if event.type == KEYUP:
+                    waiting = False
+            # draw the fps
+            pygame.display.set_caption(
+                TITLE + " | {:.2f}|".format(self.clock.get_fps()))
 
     # Game over screen
-    def show_game_over_screen(self): pass
+    def show_game_over_screen(self):
+        if not self.running: return
+        self.screen.fill(BLACK)
+        # blit the background
+        self.screen.blit(self.background, self.background_rect)
+        # draw other things on the screen
+        self.draw_text("GAME OVER", 48, BLACK, WIDTH // 2, HEIGHT // 4)
+        self.draw_text("Score: " + str(self.score), 22, BLACK, WIDTH // 2, HEIGHT // 2)
+        self.draw_text("Press a key to play again", 22, BLACK, WIDTH // 2, HEIGHT * 3 / 4)
+        pygame.display.flip()
+        self.wait_for_key()
+
+    # draw text on screen
+    def draw_text(self, text, size, color, x, y):
+        font = pygame.font.Font(self.font_name, size)
+        text_surface = font.render(text, True, color)
+        text_rect = text_surface.get_rect()
+        text_rect.midtop = (x, y)
+        self.screen.blit(text_surface, text_rect)
 
 
 g = Game()
